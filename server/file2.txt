@@ -1,0 +1,2 @@
+LOLXDHACKED,hash(user_token, message)
+secret_id, message, user_id, hash, updated_at
