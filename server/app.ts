@@ -1,6 +1,6 @@
 import express, { json } from "express";
 import crypto from "crypto"
-import cors from "cors";
+import cors, { CorsOptions } from "cors";
 import fs from 'fs/promises'
 
 const PORT = 8090;
@@ -116,7 +116,23 @@ const readData = async () => {
   }
 }
 
-app.use(cors());
+const allowedOrigins = ['http://localhost:3000']; // replace with allowed origins in production
+
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    if (allowedOrigins.includes(origin ?? '') || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: 'GET,POST',
+  allowedHeaders: ['Content-Type'],
+  credentials: true,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 
 app.get("/", async (req, res) => {
