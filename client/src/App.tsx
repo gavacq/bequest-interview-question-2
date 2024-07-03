@@ -156,6 +156,7 @@ function App() {
         flexDirection: "column",
         gap: "20px",
         fontSize: "30px",
+        boxSizing: "border-box"
       }}
     >
       <span style={{ fontSize: "26px", fontWeight: "bold" }}>Data</span>
