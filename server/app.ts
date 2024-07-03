@@ -110,13 +110,19 @@ const recoverDatabase = async (secret: string) => {
     try {
       const jsonData = await JSON.parse(fileData)
 
-      if (jsonData.data === undefined || jsonData.hash === undefined || !verifyHash(jsonData.hash, secret, jsonData.data)) {
+      if (jsonData.data === undefined || jsonData.hash === undefined) {
         const message = "Backup is corrupt or invalid"
-        console.error(message)
         await fs.unlink('database.json')
         return {
           code: ErrorCode.BACKUP_CORRUPT,
           error: message
+        }
+      }
+
+      if (!verifyHash(jsonData.hash, secret, jsonData.data)) {
+        return {
+          code: ErrorCode.VERIFICATION_FAILED,
+          error: "Verification failed"
         }
       }
 
