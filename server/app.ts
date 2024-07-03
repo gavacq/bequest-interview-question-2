@@ -9,10 +9,6 @@ const app = express();
 const database: {data: null | string, hash: null | string} = {data: null, hash: null};
 
 const createHash = (secret: string, data: string) => {
-  console.log({
-    secret,
-    data
-  })
   return crypto.createHash('sha256').update(data + secret).digest('base64')
 }
 
@@ -52,8 +48,6 @@ const verifyHash = (hash: string | null, secret: string, data: string | null) =>
     return false
   }
   const calculatedHash = createHash(secret, data)
-  console.log(calculatedHash)
-  console.log(hash)
   return hash == calculatedHash
 }
 
@@ -93,7 +87,7 @@ const recoverDatabase = async (secret: string) => {
 }
 
 const readData = async () => {
-  if (database.data == null || database.hash == null) {
+  if (database.data === null || database.hash === null) {
     try {
       const fileExists = await fs.stat("database.json")
       if (fileExists) {
@@ -108,7 +102,14 @@ const readData = async () => {
         error: "No backup exists"
       }
     }
+  } else {
+    try {
+      await fs.stat("database.json")
+    } catch (error) {
+      await writeBackupDb(database.data, database.hash)
+    }
   }
+
 
   return {
     ...database
