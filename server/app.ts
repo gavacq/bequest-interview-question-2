@@ -1,12 +1,57 @@
 import express, { json } from "express";
 import crypto from "crypto"
 import cors, { CorsOptions } from "cors";
+import helmet from "helmet";
 import fs from 'fs/promises'
 
 const PORT = 8090;
 const app = express();
 
+enum ErrorCode {
+  "IN_MEMORY_DATABASE_MISSING_OR_CORRUPT" = 1,
+  "BACKUP_MISSING" = 2,
+  "BACKUP_CORRUPT" = 3,
+  "VERIFICATION_FAILED" = 4
+}
+
 const database: {data: null | string, hash: null | string} = {data: null, hash: null};
+
+const allowedOrigins = ['http://localhost:3000']; // replace with allowed origins in production
+
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    if (allowedOrigins.includes(origin ?? '') || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: 'GET,POST',
+  allowedHeaders: ['Content-Type'],
+  credentials: true,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+const cspDirectives = {
+  defaultSrc: ["'self'", 'http://localhost:3000'],
+  scriptSrc: ["'self'", 'http://localhost:3000'],
+  styleSrc: ["'self'", 'http://localhost:3000'],
+  imgSrc: ["'self'", 'http://localhost:3000', 'data:'],
+  connectSrc: ["'self'", 'http://localhost:3000'],
+  fontSrc: ["'self'", 'http://localhost:3000'],
+  objectSrc: ["'none'"],
+  frameAncestors: ["'none'"],
+  upgradeInsecureRequests: [],
+}
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: cspDirectives,
+  },
+}));;
+
+app.use(express.json());
 
 const createHash = (secret: string, data: string) => {
   return crypto.createHash('sha256').update(data + secret).digest('base64')
@@ -57,7 +102,7 @@ const recoverDatabase = async (secret: string) => {
       fileData = await fs.readFile('database.json', 'utf-8')
     } catch (error) {
       return {
-        code: 4,
+        code: ErrorCode.BACKUP_MISSING,
         error: "No backup exists"
       }
     }
@@ -65,13 +110,12 @@ const recoverDatabase = async (secret: string) => {
     try {
       const jsonData = await JSON.parse(fileData)
 
-      // TODO: verify hash
       if (jsonData.data === undefined || jsonData.hash === undefined || !verifyHash(jsonData.hash, secret, jsonData.data)) {
         const message = "Backup is corrupt or invalid"
         console.error(message)
         await fs.unlink('database.json')
         return {
-          code: 3,
+          code: ErrorCode.BACKUP_CORRUPT,
           error: message
         }
       }
@@ -92,13 +136,13 @@ const readData = async () => {
       const fileExists = await fs.stat("database.json")
       if (fileExists) {
         return {
-          code: 1,
+          code: ErrorCode.IN_MEMORY_DATABASE_MISSING_OR_CORRUPT,
           error: "In memory database missing or corrupt. Please enter verification key and click \"Recover Data\" to attempt data recovery"
         }
       }
     } catch (error) {
       return {
-        code: 4,
+        code: ErrorCode.BACKUP_MISSING,
         error: "No backup exists"
       }
     }
@@ -115,25 +159,6 @@ const readData = async () => {
     ...database
   }
 }
-
-const allowedOrigins = ['http://localhost:3000']; // replace with allowed origins in production
-
-const corsOptions = {
-  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    if (allowedOrigins.includes(origin ?? '') || !origin) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: 'GET,POST',
-  allowedHeaders: ['Content-Type'],
-  credentials: true,
-};
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-
-app.use(express.json());
 
 app.get("/", async (req, res) => {
   try {
@@ -175,7 +200,7 @@ app.post("/verify", async (req, res) => {
           })
         }
       }
-      if (payload.code === 4) {
+      if (payload.code === ErrorCode.BACKUP_MISSING) {
         return res.json({
           code: payload.code,
           error: payload.error
@@ -185,7 +210,7 @@ app.post("/verify", async (req, res) => {
 
     if (!verifyHash(database.hash, secret, database.data)) {
       return res.json({
-        code: 2,
+        code: ErrorCode.VERIFICATION_FAILED,
         error: "Verification failed."
       })
     }

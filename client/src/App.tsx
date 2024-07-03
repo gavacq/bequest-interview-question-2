@@ -2,34 +2,20 @@ import React, { useEffect, useState } from "react";
 
 const API_URL = "http://localhost:8090";
 
-interface ClearOptions {
-  clearDataError?: boolean
-  clearSecretError?: boolean
-  clearVerifyResult?: boolean
-  clearDataInput?: boolean
-  clearSecret?: boolean
-}
-
 function App() {
   const [dataInput, setDataInput] = useState<string>("");
-  const [dataResponse, setDataResponse] = useState<string>("") // TODO: display data separately from data input
+  const [dataResponse, setDataResponse] = useState<string>("")
   const [secret, setSecret] = useState<string>("")
   const [secretError, setSecretError] = useState<string>("")
   const [verifyResult, setVerifyResult] = useState<{code: number, message: string} | null>(null)
   const [dataError, setDataError] = useState<{code: number, error: string} | null>()
 
-  const clearErrorsAndInputs = (options: ClearOptions = {
-    clearDataError: true,
-    clearDataInput: true,
-    clearSecret: true,
-    clearVerifyResult: true,
-    clearSecretError: true
-  }) => {
-    options.clearDataError && setDataError(null)
-    options.clearSecretError && setSecretError("")
-    options.clearVerifyResult && setVerifyResult(null)
-    options.clearDataInput && setDataInput("")
-    options.clearSecret && setSecret("")
+  const clearErrorsAndInputs = () => {
+    setDataError(null)
+    setSecretError("")
+    setVerifyResult(null)
+    setDataInput("")
+    setSecret("")
   }
 
   const getData = async () => {
@@ -110,10 +96,15 @@ function App() {
   };
 
   const recoverData = async () => {
+    const oldDataError = {
+      code: dataError?.code || 0,
+      error: dataError?.error || ""
+    }
     clearErrorsAndInputs()
 
     if (!isInputValid(secret)) {
       setSecretError("Please provide a verification key.")
+      setDataError(oldDataError)
       return
     }
 
@@ -167,42 +158,50 @@ function App() {
         fontSize: "30px",
       }}
     >
-      <span style={{ fontSize: "26px" }}>Data</span>
+      <span style={{ fontSize: "26px", fontWeight: "bold" }}>Data</span>
+      {dataError?.code === 1 && (
+        <button style={{ fontSize: "20px", width: "200px", height: "40px" }} onClick={recoverData}>
+          Recover Data
+        </button>
+      )}
       <span>{dataResponse}</span>
-      <input
-        style={{
-          fontSize: "30px",
-        }}
-        type="text"
-        value={dataInput}
-        onChange={(e) => setDataInput(e.target.value)}
-      />
-      {dataError ? <span style={{ color: "#ff0000", fontSize: "14px", height: "20px"}}>{dataError.error}</span>:<div style={{ marginTop: "20px"}}></div>}
-      <span style={{ fontSize: "26px" }}>Verification Key</span>
-      <input
-        style={{
-          fontSize: "30px",
-        }}
-        type="password"
-        value={secret}
-        required={true}
-        onChange={(e) => setSecret(e.target.value)}
-      />
-      {secretError ? <span style={{ color: "#ff0000", fontSize: "14px", height: "20px"}}>{secretError}</span>: <div style={{ marginTop: "20px"}}></div>}
-      {verifyResult ? <span style={{ color: `${verifyResult.code === 2 ? "#ff0000" : "#08d847"}`, fontSize: "14px", height: "20px"}}>{verifyResult.message}</span>: <div style={{ marginTop: "20px"}}></div>}
-      <div style={{ display: "flex", gap: "10px" }}>
-        <button style={{ fontSize: "20px" }} onClick={updateData}>
+      <div style={{ display: "flex", flexDirection: "row", gap: "20px"}}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px"}}>
+          <input
+            style={{
+              fontSize: "30px",
+              width: "400px",
+            }}
+            type="text"
+            value={dataInput}
+            onChange={(e) => setDataInput(e.target.value)}
+          />
+        </div>
+        <button style={{ fontSize: "20px", height: "40px", width: "140px"}} onClick={updateData}>
           Update Data
         </button>
-        <button style={{ fontSize: "20px" }} onClick={verifyData}>
+      </div>
+      <span style={{ fontSize: "26px" }}>Verification Key</span>
+      <div style={{ display: "flex", flexDirection: "row", gap: "20px"}}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px"}}>
+          <input
+            style={{
+              fontSize: "30px",
+              width: "400px",
+            }}
+            type="password"
+            value={secret}
+            required={true}
+            onChange={(e) => setSecret(e.target.value)}
+          />
+        </div>
+        <button style={{ fontSize: "20px", height: "40px", width: "140px"}} onClick={verifyData}>
           Verify Data
         </button>
-        {dataError?.code === 1 && (
-          <button style={{ fontSize: "20px" }} onClick={recoverData}>
-            Recover Data
-          </button>
-        )}
       </div>
+      {secretError && <span style={{ color: "#ff0000", fontSize: "14px", height: "20px"}}>{secretError}</span>}
+      {verifyResult && <span style={{ color: `${verifyResult.code === 4 ? "#ff0000" : "#08d847"}`, fontSize: "14px", height: "20px"}}>{verifyResult.message}</span>}
+      {dataError && <span style={{ color: "#ff0000", fontSize: "14px", height: "20px"}}>{dataError.error}</span>}
     </div>
   );
 }
