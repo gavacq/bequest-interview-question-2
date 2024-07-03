@@ -2,19 +2,48 @@ import React, { useEffect, useState } from "react";
 
 const API_URL = "http://localhost:8090";
 
-function App() {
-  const [data, setData] = useState<string>("");
-  const [secret, setSecret] = useState<string>("")
-  const [error, setError] = useState<string>("")
+interface ClearOptions {
+  clearDataError?: boolean
+  clearSecretError?: boolean
+  clearVerifyResult?: boolean
+  clearDataInput?: boolean
+  clearSecret?: boolean
+}
 
-  useEffect(() => {
-    getData();
-  }, []);
+function App() {
+  const [dataInput, setDataInput] = useState<string>("");
+  const [dataResponse, setDataResponse] = useState<string>("") // TODO: display data separately from data input
+  const [secret, setSecret] = useState<string>("")
+  const [secretError, setSecretError] = useState<string>("")
+  const [verifyResult, setVerifyResult] = useState<{code: number, message: string} | null>(null)
+  const [dataError, setDataError] = useState<{code: number, error: string} | null>()
+
+  const clearErrorsAndInputs = (options: ClearOptions = {
+    clearDataError: true,
+    clearDataInput: true,
+    clearSecret: true,
+    clearVerifyResult: true,
+    clearSecretError: true
+  }) => {
+    options.clearDataError && setDataError(null)
+    options.clearSecretError && setSecretError("")
+    options.clearVerifyResult && setVerifyResult(null)
+    options.clearDataInput && setDataInput("")
+    options.clearSecret && setSecret("")
+  }
 
   const getData = async () => {
     const response = await fetch(API_URL);
-    const { data } = await response.json();
-    setData(data);
+    const payload  = await response.json();
+    if (payload.error) {
+      setDataError({
+        code: payload.code,
+        error: payload.error
+      })
+      return null
+    }
+
+    return payload
   };
 
   const isInputValid = (input: string) => {
@@ -26,26 +55,102 @@ function App() {
   }
 
   const updateData = async () => {
+    clearErrorsAndInputs()
+
     if (!isInputValid(secret)) {
-      setError("Please provide a verification key.")
+      setSecretError("Please provide a verification key.")
       return
     }
 
     const res = await fetch(API_URL, {
       method: "POST",
-      body: JSON.stringify({ data, secret }),
+      body: JSON.stringify({ data: dataInput, secret }),
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
     });
-    const body = await res.json()
-    console.log(body)
+    const {data} = await res.json()
+    setDataResponse(data)
+    return data
   };
 
   const verifyData = async () => {
-    throw new Error("Not implemented");
+    clearErrorsAndInputs()
+
+    if (!isInputValid(secret)) {
+      setSecretError("Please provide a verification key")
+      return
+    }
+
+    const res = await fetch(`${API_URL}/verify`, {
+      method: "POST",
+      body: JSON.stringify({
+        secret
+      }),
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      }
+    })
+
+    const payload = await res.json()
+    if (payload.error !== undefined) {
+      setVerifyResult({
+        message: payload.error,
+        code: payload.code
+      })
+      return
+    }
+
+    setVerifyResult({
+      code: 0,
+      message: payload.message
+    })
   };
+
+  const recoverData = async () => {
+    clearErrorsAndInputs()
+
+    if (!isInputValid(secret)) {
+      setSecretError("Please provide a verification key.")
+      return
+    }
+
+    const res = await fetch(`${API_URL}/recover`, {
+      method: "POST",
+      body: JSON.stringify({
+        secret
+      }),
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      }
+    })
+
+    const payload = await res.json()
+    if (payload.error !== undefined) {
+      console.log(payload)
+      setDataError({
+        code: payload.code,
+        error:payload.error
+      })
+      return
+    }
+
+    setDataResponse(payload.data)
+  }
+
+  useEffect(() => {
+    (async () => {
+      const payload = await getData()
+      if (payload) {
+        setDataResponse(payload.data)
+      }
+
+    })()
+
+  }, [])
 
   return (
     <div
@@ -62,17 +167,17 @@ function App() {
         fontSize: "30px",
       }}
     >
-      <div>Saved Data</div>
       <span style={{ fontSize: "26px" }}>Data</span>
+      <span>{dataResponse}</span>
       <input
         style={{
           fontSize: "30px",
-          marginBottom: "20px"
         }}
         type="text"
-        value={data}
-        onChange={(e) => setData(e.target.value)}
+        value={dataInput}
+        onChange={(e) => setDataInput(e.target.value)}
       />
+      {dataError ? <span style={{ color: "#ff0000", fontSize: "14px", height: "20px"}}>{dataError.error}</span>:<div style={{ marginTop: "20px"}}></div>}
       <span style={{ fontSize: "26px" }}>Verification Key</span>
       <input
         style={{
@@ -83,7 +188,8 @@ function App() {
         required={true}
         onChange={(e) => setSecret(e.target.value)}
       />
-      {error ? <span style={{ color: "#ff0000", fontSize: "14px", height: "20px"}}>{error}</span>: <div style={{ marginTop: "20px"}}></div>}
+      {secretError ? <span style={{ color: "#ff0000", fontSize: "14px", height: "20px"}}>{secretError}</span>: <div style={{ marginTop: "20px"}}></div>}
+      {verifyResult ? <span style={{ color: `${verifyResult.code === 2 ? "#ff0000" : "#08d847"}`, fontSize: "14px", height: "20px"}}>{verifyResult.message}</span>: <div style={{ marginTop: "20px"}}></div>}
       <div style={{ display: "flex", gap: "10px" }}>
         <button style={{ fontSize: "20px" }} onClick={updateData}>
           Update Data
@@ -91,6 +197,11 @@ function App() {
         <button style={{ fontSize: "20px" }} onClick={verifyData}>
           Verify Data
         </button>
+        {dataError?.code === 1 && (
+          <button style={{ fontSize: "20px" }} onClick={recoverData}>
+            Recover Data
+          </button>
+        )}
       </div>
     </div>
   );
