@@ -121,11 +121,18 @@ function App() {
 
     const payload = await res.json()
     if (payload.error !== undefined) {
-      console.log(payload)
-      setDataError({
-        code: payload.code,
-        error:payload.error
-      })
+      if (payload.code === 4) {
+        setVerifyResult({
+          message: payload.error,
+          code: payload.code
+        })
+        setDataError(oldDataError)
+      } else {
+        setDataError({
+          code: payload.code,
+          error: payload.error
+        })
+      }
       return
     }
 
